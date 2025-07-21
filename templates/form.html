@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Water Quality Prediction</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Water Quality Prediction</h1>
+        <form method="post" action="/predict/">
+            <label for="pH">pH:</label>
+            <input type="number" step="0.01" name="pH" required value="{{ pH or '' }}"><br>
+
+            <label for="Tur">Turbidity:</label>
+            <input type="number" step="0.01" name="Tur" required value="{{ Tur or '' }}"><br>
+
+            <label for="Cond">Conductivity:</label>
+            <input type="number" step="0.01" name="Cond" required value="{{ Cond or '' }}"><br>
+
+            <button type="submit">Predict</button>
+        </form>
+
+        {% if ph_pred is defined %}
+        <div class="results">
+            <h2>Predicted Values:</h2>
+            <ul>
+                <li><strong>pH (Next):</strong> {{ ph_pred }}</li>
+                <li><strong>Turbidity (Next):</strong> {{ tur_pred }}</li>
+                <li><strong>Conductivity (Next):</strong> {{ cond_pred }}</li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</body>
+
+</html>
