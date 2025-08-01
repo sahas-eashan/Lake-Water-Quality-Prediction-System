@@ -186,7 +186,7 @@ Visit [http://localhost:8000](http://localhost:8000).
 * [LightGBM Documentation](https://lightgbm.readthedocs.io/)
 * [m2cgen: Model to Code Generator](https://github.com/BayesWitnesses/m2cgen)
 * [Adafruit SSD1306 OLED Library](https://github.com/adafruit/Adafruit_SSD1306)
-* [Lake Water Quality Datasets](#) *(insert link if public)*
+* [Lake Water Quality Datasets](https://www.nature.com/articles/s41597-025-04915-y) 
 
 ---
 
