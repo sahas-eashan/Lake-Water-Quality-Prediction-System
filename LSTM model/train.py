@@ -4,6 +4,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import pickle
 import os
+from tqdm import tqdm
 
 
 class ChunkedDataset(Dataset):
@@ -113,7 +114,8 @@ class MultiStepLSTM(nn.Module):
 def train_epoch(model, device, train_loader, optimizer, criterion):
     model.train()
     total_loss = 0
-    for xb, yb in train_loader:
+    pbar = tqdm(train_loader, desc="Training", leave=False)
+    for xb, yb in pbar:
         xb, yb = xb.to(device), yb.to(device)
         optimizer.zero_grad()
         pred = model(xb)
@@ -121,6 +123,7 @@ def train_epoch(model, device, train_loader, optimizer, criterion):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+        pbar.set_postfix(loss=loss.item())
     return total_loss / len(train_loader)
 
 
@@ -128,11 +131,13 @@ def validate_epoch(model, device, val_loader, criterion):
     model.eval()
     total_loss = 0
     with torch.no_grad():
-        for xb, yb in val_loader:
+        pbar = tqdm(val_loader, desc="Validation", leave=False)
+        for xb, yb in pbar:
             xb, yb = xb.to(device), yb.to(device)
             pred = model(xb)
             loss = criterion(pred, yb)
             total_loss += loss.item()
+            pbar.set_postfix(loss=loss.item())
     return total_loss / len(val_loader)
 
 
@@ -140,7 +145,9 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    train_loader, val_loader, test_loader = create_data_loaders(batch_size=128)
+    torch.backends.cudnn.benchmark = True
+
+    train_loader, val_loader, test_loader = create_data_loaders(batch_size=64)
 
     model = MultiStepLSTM(
         input_size=3, hidden_size=64, num_layers=2, output_size=3, seq_len=12
@@ -163,6 +170,10 @@ def main():
             best_val_loss = val_loss
             torch.save(model.state_dict(), "multistep_lstm_best.pt")
             print("Saved new best model")
+
+        if (epoch + 1) % 5 == 0:
+            torch.save(model.state_dict(), f"checkpoint_epoch_{epoch+1}.pt")
+            print(f"Saved checkpoint at epoch {epoch+1}")
 
     print("Training complete!")
 
