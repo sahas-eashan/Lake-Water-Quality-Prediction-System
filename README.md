@@ -186,7 +186,7 @@ Visit [http://localhost:8000](http://localhost:8000).
 * [LightGBM Documentation](https://lightgbm.readthedocs.io/)
 * [m2cgen: Model to Code Generator](https://github.com/BayesWitnesses/m2cgen)
 * [Adafruit SSD1306 OLED Library](https://github.com/adafruit/Adafruit_SSD1306)
-* [Lake Water Quality Datasets](#) *(insert link if public)*
+* [Lake Water Quality Datasets](https://www.nature.com/articles/s41597-025-04915-y) 
 
 ---
 
@@ -199,19 +199,8 @@ University of Moratuwa, Sri Lanka
 
 ## 🚀 Future Work
 
-* Extend to multiple locations and real-time streaming
-* Add data logging, wireless upload, or alerting features
-* Experiment with other ML models and deployment strategies
+* Extend to multiple locations using LSTM and deplying in AWS
+* 
+
 
 ---
-
-```
-
----
-
-- **Update the paths to images if your folder structure is different.**
-- If you want to add code snippets or diagrams, let me know!
-- You can always further tweak the algorithm section if you want to discuss regularization, tree parameters, etc.
-
-Let me know if you want a version with more technical depth on any specific ML algorithm!
-```
