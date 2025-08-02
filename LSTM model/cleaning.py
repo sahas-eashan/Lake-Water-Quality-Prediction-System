@@ -1,5 +1,7 @@
 import pandas as pd
 
+data_all = pd.read_csv("all_locations_timeseries.csv")
+
 print("Before cleaning:")
 print("Number of rows:", len(data_all))
 print("Missing values:\n", data_all.isnull().sum())
