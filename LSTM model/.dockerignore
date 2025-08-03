@@ -1,0 +1,16 @@
+# Exclude all CSV data and chunking scripts
+*.csv
+chunking_data.py
+cleaning.py
+train.py
+checkpoint_epoch_*.pt
+
+# Exclude images and other non-essential files
+*.png
+
+# Exclude environment and IDE files
+.pyvenv*
+.vscode/
+.git/
+__pycache__/
+*.pyc
