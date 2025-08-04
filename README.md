@@ -82,7 +82,7 @@ The workflow covers:
 
 - Run the Docker container locally with:
 
-  ```bash
+```bash
   docker run -p 8000:8080 waterquality-api-lambda
 ````
 
@@ -187,5 +187,4 @@ University of Moratuwa, Sri Lanka
 
 ---
 
-Would you like me to upload this as `README.md` for you to download?
-```
+
