@@ -1,18 +1,19 @@
 
 # Lake Water Quality Prediction System
-**End-to-End ML + IoT Project with ESP32 Deployment**
+**End-to-End ML + IoT Project with ESP32 Deployment and Cloud Inference**
 
 ---
 
 ## 🚩 Project Overview
 
-This project predicts three crucial lake water quality parameters — **pH, Turbidity, and Conductivity** — using machine learning, and deploys the predictive models on an ESP32-based hardware system with real-time sensors and OLED display.
+This project predicts three crucial lake water quality parameters — **pH, Turbidity, and Conductivity** — using machine learning models trained on large-scale lake data, and deploys the predictive models both on microcontrollers (ESP32) and cloud (AWS Lambda via Docker).
 
 The workflow covers:
-- Large-scale data collection and cleaning
-- Model training and evaluation (XGBoost, LightGBM, SARIMA)
-- Model selection and export for microcontroller
-- Arduino/ESP32 firmware for field deployment
+- Large-scale data collection, cleaning, and chunked processing
+- Model training and evaluation (XGBoost, LightGBM, SARIMA, and LSTM)
+- LSTM model training for multi-location time series forecasting using PyTorch and GPU acceleration
+- Containerized FastAPI inference API with the LSTM model deployed on AWS Lambda using Docker
+- Arduino/ESP32 firmware for field deployment with sensor integration and on-device inference
 
 ---
 
@@ -21,12 +22,17 @@ The workflow covers:
 - **Dataset:**  
   - ~80,000 lake locations  
   - Records from 2000 to 2023  
-  - Each record: pH, Turbidity (NTU), Conductivity (TDS, µS/cm)
-- **Approach:**  
-  - For prototyping, a single representative location's time series data was selected and extracted
-  - Data cleaning included outlier removal and gap-filling
+  - Each record includes pH, Turbidity (NTU), Conductivity (TDS, µS/cm)
 
-### **Before and After Data Cleaning**
+- **Prototyping:**  
+  - Initially focused on a single location with cleaned time series data  
+  - Then extended to global multi-location data modeled with an LSTM
+
+- **Cleaning:**  
+  - Removed missing/outlier values  
+  - Ensured physically plausible ranges (pH between 0 and 14, non-negative conductivity and turbidity)
+
+- **Before and After Cleaning**
 
 | Before Cleaning            | After Cleaning           |
 |---------------------------|-------------------------|
@@ -36,157 +42,132 @@ The workflow covers:
 
 ## 🧠 Model Training & Evaluation
 
-### **1. Models Compared**
+### 1. Classical Models (Single Location)
 
-| Algorithm    | Model Type                | Main Loss Function          | Description                                |
-|--------------|--------------------------|-----------------------------|--------------------------------------------|
-| XGBoost      | Gradient Boosting (Tree) | Mean Squared Error (MSE)    | Sequential boosting, robust for tabular data|
-| LightGBM     | Gradient Boosting (Tree) | Mean Squared Error (MSE)    | Fast, memory-efficient boosting            |
-| SARIMA       | Time Series (ARIMA)      | Maximum Likelihood / MSE    | Classical time-series for univariate trends |
-
-#### **Details:**
-- **XGBoost & LightGBM** are ensemble methods that use gradient boosting of decision trees to minimize MSE in regression tasks.
-- **SARIMA** is a statistical model for time series forecasting, using only the history of the target variable itself.
-
-### **2. Training Workflow**
-
-- **Input features:** current month's pH, Turbidity, Conductivity
-- **Targets:** next month's pH, Turbidity, Conductivity
-- **Train/test split:** 80/20
-- **Hyperparameters:** Defaults used as further tuning did not improve real-world performance
-
-### **3. Model Comparison Table (MSE)**
-
-| Parameter | LightGBM_MSE | XGBoost_MSE | SARIMA_MSE | Selected Model |
-|-----------|--------------|-------------|------------|---------------|
-| pH_next   | 0.02148      | 0.02107     | 0.09094    | XGBoost       |
-| Tur_next  | 0.22462      | 0.16435     | 1.31170    | XGBoost       |
-| Cond_next | 0.00007      | 0.00007     | 0.00016    | XGBoost       |
-
-**Result:**  
-XGBoost was selected for all three parameters due to the lowest or equal MSE.
+| Algorithm | Type                  | Loss Function          | Outcome                  |
+|-----------|-----------------------|-----------------------|--------------------------|
+| XGBoost   | Gradient Boosting Tree| Mean Squared Error (MSE) | Selected best on single-location data |
+| LightGBM  | Gradient Boosting Tree| Mean Squared Error (MSE) | Close runner-up           |
+| SARIMA    | Time Series           | Likelihood/MSE         | Underperformed            |
 
 ---
 
-## 🖥️ FastAPI Web Demo
+### 2. LSTM Model (Multi-Location Global Forecasting)
 
-A demo web interface is provided for manual entry and prediction (see `main.py`).
+- Implemented a **multi-step, multi-feature LSTM** in PyTorch.
+- Trained on chunked datasets covering all locations, leveraging GPU acceleration.
+- Trained to forecast next 12 months’ pH, Turbidity, and Conductivity given previous 12 months.
+- Used advanced training strategies:
+  - Mixed precision training (`torch.cuda.amp`)
+  - Gradient scaling
+  - Adaptive learning rate scheduler
+  - Early stopping with patience
+- Achieved improved generalization on large-scale data.
+- Used ~5% of total data (~767,585 sequences) per epoch to fit memory constraints, from a total of over 15 million sequences.
 
-**Run locally:**
-```bash
-python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
-uvicorn main:app --reload
+---
+
+## ☁️ Cloud Deployment: AWS Lambda with Docker
+
+- Containerized the FastAPI inference server hosting the LSTM model.
+- Used AWS Elastic Container Registry (ECR) for storing Docker images.
+- Deployed container on AWS Lambda as a serverless function with:
+  - Custom timeout and memory settings for model loading and inference.
+  - Lambda API Gateway configured to route `/waterquality-lambda` POST requests.
+- Supports scalable, on-demand inference accessible via HTTPS API.
+
+---
+
+## 🖥️ Local Testing
+
+- Run the Docker container locally with:
+
+  ```bash
+  docker run -p 8000:8080 waterquality-api-lambda
 ````
 
-Visit [http://localhost:8000](http://localhost:8000).
+* Test inference with:
+
+  ```python
+  import requests
+  url = "http://localhost:8000/waterquality-lambda"
+  data = {"input_sequence": [[7.5, 0.03, 5.0], ..., [7.51, 0.026, 5.00]]}
+  response = requests.post(url, json=data)
+  print(response.json())
+  ```
 
 ---
 
-## 🕹️ Model Export & Microcontroller Deployment
+## 🕹️ Microcontroller Deployment
 
-### **1. Model Export for Embedded Use**
+* Exported XGBoost models to C header files using [m2cgen](https://github.com/BayesWitnesses/m2cgen).
+* Developed firmware for ESP32 with:
 
-* Each trained XGBoost model was exported using [m2cgen](https://github.com/BayesWitnesses/m2cgen) as C header files for Arduino:
-
-  * `model_xgb_ph.h`
-  * `model_xgb_tur.h`
-  * `model_xgb_cond.h`
-
-### **2. Hardware Setup**
-
-* **Microcontroller:** ESP32-WROOM-32 (4MB)
-* **Sensors:**
-
-  * pH sensor/probe (0–14)
-  * Turbidity sensor (NTU)
-  * TDS/Conductivity sensor (µS/cm)
-* **Display:** 0.96" SSD1306 OLED (I2C)
-* **User Interface:** 3 push buttons (Next, OK, Back)
-
-### **3. Firmware Design**
-
-* **Menu-driven UI**: User steps through each sensor, views real-time readings, confirms by pressing "OK"
-* **Prediction**: After collecting all three values, user can trigger prediction with a button press
-* **Display**: Predicted next-month values shown on OLED; user can restart cycle
-
-#### **Main Features:**
-
-* Interactive, user-friendly hardware UI
-* Real-time sensor reading and display
-* Machine learning inference on-device with no cloud required
+  * Sensor interfacing (pH, Turbidity, Conductivity)
+  * OLED display and button menu UI
+  * On-device ML inference using exported models
 
 ---
 
-## 🔌 Arduino Code Structure
-
-* **Main file** (`.ino` or `.cpp`):
-
-  * Handles menu logic, sensor reading, display updates
-  * Uses model headers for ML inference
-* **Model headers**: `model_xgb_ph.h`, `model_xgb_tur.h`, `model_xgb_cond.h` (generated via m2cgen)
-
-**Display code is modularized for easy updates and maintenance.**
-
----
-
-## 🧩 File Structure
+## 🧩 Project Structure
 
 ```
 .
 ├── data/
 │   └── location_10_realtime_model_data.csv
 ├── models/
+│   ├── multistep_lstm_best.pt
 │   ├── xgboost_pH_next.json
-│   ├── xgboost_Tur_next.json
-│   ├── xgboost_Cond_next.json
 │   ├── model_xgb_ph.h
-│   ├── model_xgb_tur.h
-│   └── model_xgb_cond.h
+│   └── ...
 ├── Small_Model/
 │   ├── main.py
 │   ├── model_comparison.py
-│   ├── read_plot.py
 │   ├── Figure_1.png
-│   └── Figure_2.png
+│   ├── Figure_2.png
+│   └── ...
+├── LSTM_Model/
+│   ├── train.py
+│   ├── chunked_dataset.py
+│   ├── multistep_lstm_best.pt
+│   └── ...
 ├── arduino/
 │   ├── water_quality_predictor.ino
 │   ├── model_xgb_ph.h
-│   ├── model_xgb_tur.h
-│   └── model_xgb_cond.h
+│   └── ...
+├── lambda_deployment/
+│   ├── Dockerfile
+│   ├── app.py
+│   ├── requirements.txt
+│   └── multistep_lstm_best.pt
 └── README.md
 ```
 
 ---
 
-## ⚡ How to Reproduce
+## 🚀 How to Reproduce
 
-1. **Data Preparation & Cleaning:**
+1. **Data Preparation & Cleaning**
 
-   * Place CSV in `/data`
-   * Run Python scripts for cleaning and exploratory analysis
+2. **Train classical models** (run `Small_Model/model_comparison.py`) for initial prototyping.
 
-2. **Model Training:**
+3. **Train global LSTM** using chunked datasets and GPU (see `LSTM_Model/train.py`).
 
-   * Run `model_comparison.py` to train and compare models
-   * Export selected XGBoost models as `.json`, then use `m2cgen` to generate `.h` files
+4. **Containerize LSTM inference API** (`lambda_deployment/Dockerfile`).
 
-3. **Microcontroller Deployment:**
+5. **Deploy Docker container to AWS Lambda and configure API Gateway**.
 
-   * Copy generated `.h` files to Arduino project
-   * Upload Arduino code to ESP32
-   * Connect sensors, OLED, and buttons per wiring diagram
+6. **Develop ESP32 firmware** for on-device inference and user interaction.
 
 ---
 
-## 📝 References
+## 📚 References
 
-* [XGBoost Documentation](https://xgboost.readthedocs.io/)
-* [LightGBM Documentation](https://lightgbm.readthedocs.io/)
-* [m2cgen: Model to Code Generator](https://github.com/BayesWitnesses/m2cgen)
+* [PyTorch LSTM Tutorial](https://pytorch.org/tutorials/beginner/nlp/sequence_models_tutorial.html)
+* [AWS Lambda Container Images](https://docs.aws.amazon.com/lambda/latest/dg/images-create.html)
+* [FastAPI Documentation](https://fastapi.tiangolo.com/)
+* [m2cgen Model to Code](https://github.com/BayesWitnesses/m2cgen)
 * [Adafruit SSD1306 OLED Library](https://github.com/adafruit/Adafruit_SSD1306)
-* [Lake Water Quality Datasets](https://www.nature.com/articles/s41597-025-04915-y) 
 
 ---
 
@@ -199,8 +180,12 @@ University of Moratuwa, Sri Lanka
 
 ## 🚀 Future Work
 
-* Extend to multiple locations using LSTM and deplying in AWS
-* 
+* Extend to multiple location LSTM online predictions via REST API
+* Full web app frontend for live data input and trend visualization
+* Expand on-device ML capabilities with LSTM or TinyML models on ESP32
 
 
 ---
+
+Would you like me to upload this as `README.md` for you to download?
+```
