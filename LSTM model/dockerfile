@@ -1,11 +1,9 @@
 FROM public.ecr.aws/lambda/python:3.10
 
-# Copy app and requirements
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app.py .
 COPY multistep_lstm_best.pt .
 
-# Command to run Lambda Python runtime interface client
 CMD ["app.handler"]
